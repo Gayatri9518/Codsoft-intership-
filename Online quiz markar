@@ -1,0 +1,46 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Quiz, Question
+from .forms import QuizForm, QuestionForm
+from django.contrib.auth.decorators import login_required
+
+def home(request):
+    quizzes = Quiz.objects.all()
+    return render(request, 'quiz/home.html', {'quizzes': quizzes})
+
+@login_required
+def create_quiz(request):
+    if request.method == 'POST':
+        quiz_form = QuizForm(request.POST)
+        if quiz_form.is_valid():
+            quiz = quiz_form.save(commit=False)
+            quiz.creator = request.user
+            quiz.save()
+            return redirect('add_question', quiz_id=quiz.id)
+    else:
+        quiz_form = QuizForm()
+    return render(request, 'quiz/create_quiz.html', {'quiz_form': quiz_form})
+
+@login_required
+def add_question(request, quiz_id):
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+    if request.method == 'POST':
+        question_form = QuestionForm(request.POST)
+        if question_form.is_valid():
+            question = question_form.save(commit=False)
+            question.quiz = quiz
+            question.save()
+            return redirect('add_question', quiz_id=quiz.id)
+    else:
+        question_form = QuestionForm()
+    return render(request, 'quiz/add_question.html', {'quiz': quiz, 'question_form': question_form})
+
+def take_quiz(request, quiz_id):
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+    if request.method == 'POST':
+        score = 0
+        for question in quiz.questions.all():
+            selected = request.POST.get(str(question.id))
+            if selected == question.correct_option:
+                score += 1
+        return render(request, 'quiz/results.html', {'quiz': quiz, 'score': score, 'total': quiz.questions.count()})
+    return render(request, 'quiz/take_quiz.html', {'quiz': quiz})
